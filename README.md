@@ -2,7 +2,7 @@
 
 **The fastest way to understand today's news.**
 
-Narrate is a production-ready Next.js 15 web application that aggregates news from multiple sources and uses AI-powered summaries to help you understand articles in seconds. Browse, search, bookmark, and get intelligent insights from any article.
+Narrate is a production-ready Vite + React web application that aggregates news from multiple sources and uses AI-powered summaries to help you understand articles in seconds. Browse, search, bookmark, and get intelligent insights from any article.
 
 ## ✨ Features
 
@@ -22,11 +22,11 @@ Narrate is a production-ready Next.js 15 web application that aggregates news fr
 
 ### Tech Stack
 
-- **Frontend**: Next.js 15 (React 19) with TypeScript
+- **Frontend**: Vite + React 19 with TypeScript, client-side routing via [wouter](https://github.com/molefrog/wouter)
+- **Backend**: Express (serves the built static assets in production)
 - **Styling**: TailwindCSS 4 + shadcn/ui
 - **Animation**: Framer Motion
 - **Forms**: React Hook Form + Zod
-- **Data Fetching**: TanStack Query (client-side)
 - **News API**: FreeNewsAPI
 - **AI**: Groq (OpenAI-compatible)
 - **Storage**: Browser localStorage with repository pattern
@@ -35,51 +35,43 @@ Narrate is a production-ready Next.js 15 web application that aggregates news fr
 
 ```
 narrate/
-├── client/src/
-│   ├── app/
-│   │   ├── (landing)/page.tsx          # Public landing page
-│   │   ├── (app)/                      # App shell
-│   │   │   ├── home/page.tsx           # News feed
-│   │   │   ├── search/page.tsx         # Search
-│   │   │   ├── article/[id]/page.tsx   # Article detail
-│   │   │   ├── bookmarks/page.tsx      # Bookmarks
-│   │   │   ├── history/page.tsx        # History
-│   │   │   └── settings/page.tsx       # Settings
-│   │   ├── layout.tsx                  # Root layout
-│   │   └── not-found.tsx
-│   ├── components/
-│   │   ├── ui/                         # shadcn/ui components
-│   │   ├── layout/                     # Navbar, Sidebar
-│   │   ├── shared/                     # Typography, EmptyState, etc.
-│   │   ├── ArticleCard.tsx
-│   │   ├── CategoryTabs.tsx
-│   │   ├── SkeletonCard.tsx
-│   │   ├── SummaryPanel.tsx
-│   │   └── StreamingText.tsx
-│   ├── lib/
-│   │   ├── storage/                    # localStorage repositories
-│   │   │   ├── StorageService.ts
-│   │   │   ├── CacheRepository.ts
-│   │   │   ├── BookmarksRepository.ts
-│   │   │   ├── SummaryRepository.ts
-│   │   │   ├── HistoryRepository.ts
-│   │   │   └── PreferencesRepository.ts
-│   │   ├── api/                        # API clients
-│   │   │   ├── freenews.ts
-│   │   │   └── groq.ts
-│   │   ├── hooks/                      # Custom React hooks
-│   │   ├── types/                      # TypeScript types
-│   │   ├── utils/                      # Utility functions
-│   │   ├── constants/                  # Constants
-│   │   └── animations/                 # Framer Motion variants
-│   ├── contexts/                       # React contexts
-│   ├── pages/                          # Page components
-│   ├── App.tsx                         # Router
-│   └── main.tsx                        # Entry point
+├── client/
+│   ├── index.html                      # Vite entry HTML
+│   └── src/
+│       ├── pages/                      # Route-level page components
+│       │   ├── Landing.tsx             # Public landing page
+│       │   ├── Home.tsx                # News feed
+│       │   └── NotFound.tsx
+│       ├── components/
+│       │   ├── ui/                     # shadcn/ui components
+│       │   ├── layout/                 # Navbar, Sidebar
+│       │   ├── shared/                 # Typography, EmptyState, etc.
+│       │   ├── ArticleCard.tsx
+│       │   ├── CategoryTabs.tsx
+│       │   ├── SkeletonCard.tsx
+│       │   ├── SummaryPanel.tsx
+│       │   └── StreamingText.tsx
+│       ├── lib/
+│       │   ├── storage/                # localStorage repositories
+│       │   │   ├── CacheRepository.ts
+│       │   │   ├── BookmarksRepository.ts
+│       │   │   ├── SummaryRepository.ts
+│       │   │   └── PreferencesRepository.ts
+│       │   ├── api/                    # API clients (e.g. groq.ts)
+│       │   ├── hooks/                  # Custom React hooks
+│       │   └── constants/              # Constants
+│       ├── contexts/                   # React contexts
+│       ├── hooks/                      # Additional shared hooks
+│       ├── App.tsx                     # Router (wouter)
+│       └── main.tsx                    # Entry point
+├── server/
+│   └── index.ts                        # Express server (serves dist/public)
+├── shared/
+│   └── const.ts                        # Constants shared client/server
 ├── .env.example                        # Environment variables template
 ├── package.json
 ├── tsconfig.json
-├── tailwind.config.ts
+├── vite.config.ts
 └── README.md
 ```
 
@@ -137,8 +129,8 @@ Browser localStorage
 ### Build for Production
 
 ```bash
-pnpm build
-pnpm start
+pnpm build   # builds the Vite client and bundles the Express server into dist/
+pnpm start   # runs the production server (serves dist/public)
 ```
 
 ## 📖 Usage
@@ -264,21 +256,20 @@ pnpm format   # Format code
 
 ## 📦 Deployment
 
-### Vercel (Recommended)
+This app is a single Node.js server (Express) that serves the built Vite frontend, so it deploys well to any Node hosting platform that runs a persistent server (not a serverless-only platform).
+
+### Railway / Render (Recommended)
 
 1. Push code to GitHub
-2. Connect repository to Vercel
-3. Add environment variables in Vercel dashboard
-4. Deploy automatically on push
+2. Create a new service and connect the repository
+3. Set the build command to `pnpm install && pnpm build`
+4. Set the start command to `pnpm start`
+5. Add `FREE_NEWS_API_KEY` and `GROQ_API_KEY` as environment variables
+6. Deploy
 
 ### Other Platforms
 
-The app is compatible with any Node.js hosting:
-- Railway
-- Render
-- Netlify
-- AWS Amplify
-- DigitalOcean
+Any host that runs a long-lived Node process works: DigitalOcean App Platform, Fly.io, AWS Elastic Beanstalk, etc. Vercel/Netlify work too, but you'll need to adapt the Express server to their serverless function format since it isn't a Next.js app.
 
 ## 🛣️ Roadmap
 
