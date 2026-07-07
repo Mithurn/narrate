@@ -91,7 +91,11 @@ async function callGNews(
     throw new Error("GNEWS_API_KEY is not set on the server");
   }
 
-  const url = new URL(path, BASE_URL);
+  // NOTE: new URL(path, BASE_URL) would treat a leading "/" in `path` as
+  // absolute-from-origin and silently drop the "/api/v4" prefix, so this
+  // builds the full URL string directly instead of relying on relative
+  // URL resolution.
+  const url = new URL(`${BASE_URL}${path}`);
   for (const [key, value] of Object.entries(params)) {
     url.searchParams.set(key, value);
   }

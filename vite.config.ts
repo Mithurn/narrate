@@ -7,6 +7,14 @@ import { defineConfig, type Plugin, type ViteDevServer } from "vite";
 import { vitePluginManusRuntime } from "vite-plugin-manus-runtime";
 import { createApp } from "./server/app";
 
+// Vite's dev server doesn't populate process.env from .env files for plugin
+// code (only import.meta.env for client bundling), so the API route handlers
+// in server/app.ts wouldn't see the GNEWS/GROQ keys without this.
+const envLocalPath = path.resolve(import.meta.dirname, ".env.local");
+if (fs.existsSync(envLocalPath)) {
+  process.loadEnvFile(envLocalPath);
+}
+
 // =============================================================================
 // Manus Debug Collector - Vite Plugin
 // Writes browser logs directly to files, trimmed when exceeding size limit

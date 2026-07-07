@@ -1,3 +1,4 @@
+import { existsSync } from "fs";
 import { createServer } from "http";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -6,6 +7,13 @@ import { createApp } from "./app";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Load .env.local for local `pnpm start` runs; hosting platforms (Railway,
+// Render, etc.) inject real env vars directly, so this is a no-op there.
+const envLocalPath = path.resolve(__dirname, "..", ".env.local");
+if (existsSync(envLocalPath)) {
+  process.loadEnvFile(envLocalPath);
+}
 
 async function startServer() {
   const app = createApp();
