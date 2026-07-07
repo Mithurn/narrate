@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { motion } from "framer-motion";
+import { toast } from "sonner";
 import { Headline, Lead } from "@/components/shared/Typography";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ArticleCard } from "@/components/ArticleCard";
@@ -8,9 +9,19 @@ import { SkeletonCard } from "@/components/SkeletonCard";
 import { SummaryPanel } from "@/components/SummaryPanel";
 import { Navbar } from "@/components/layout/Navbar";
 import { Sidebar } from "@/components/layout/Sidebar";
-import { useBookmarks, useHistory, useSummary, useKeyboardShortcuts } from "@/lib/hooks";
+import {
+  useBookmarks,
+  useHistory,
+  useSummary,
+  useKeyboardShortcuts,
+} from "@/lib/hooks";
+import { fetchArticles } from "@/lib/api/news";
+import { summarizeArticle } from "@/lib/api/groq";
+import CacheRepository from "@/lib/storage/CacheRepository";
 import { Newspaper } from "lucide-react";
 import type { Article, Summary } from "@/lib/types/index";
+
+const cacheRepo = new CacheRepository();
 
 export default function Home() {
   const [activeCategory, setActiveCategory] = useState("latest");
@@ -22,114 +33,99 @@ export default function Home() {
   const [currentSummary, setCurrentSummary] = useState<Summary | undefined>();
   const [summaryLoading, setSummaryLoading] = useState(false);
 
-  const { bookmarks, addBookmark, removeBookmark, isBookmarked } = useBookmarks();
-  const { addReadingEntry } = useHistory();
+  const { bookmarks, addBookmark, removeBookmark, isBookmarked } =
+    useBookmarks();
+  const { addReadingEntry, addSummaryEntry } = useHistory();
   const { getSummary, saveSummary } = useSummary();
 
-  // Mock data - replace with actual API calls
-  const mockArticles: Article[] = [
-    {
-      id: "1",
-      title: "The Future of AI: What's Next in 2026",
-      description: "Explore the latest developments in artificial intelligence and what experts predict for the coming year.",
-      content: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-      url: "https://example.com/ai-future",
-      urlToImage: "https://images.unsplash.com/photo-1677442d019cecf8f6b559f3b4e3b5f5?w=500&h=300&fit=crop",
-      publishedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-      source: { id: "techcrunch", name: "TechCrunch" },
-      author: "John Doe",
-      category: "technology",
-    },
-    {
-      id: "2",
-      title: "Global Markets Rally on Economic Optimism",
-      description: "Stock markets worldwide show strong performance as economic indicators improve.",
-      content: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-      url: "https://example.com/markets",
-      urlToImage: "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=500&h=300&fit=crop",
-      publishedAt: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
-      source: { id: "bloomberg", name: "Bloomberg" },
-      author: "Jane Smith",
-      category: "business",
-    },
-    {
-      id: "3",
-      title: "Breakthrough in Cancer Research",
-      description: "Scientists announce a major discovery in treating certain types of cancer.",
-      content: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-      url: "https://example.com/cancer",
-      urlToImage: "https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=500&h=300&fit=crop",
-      publishedAt: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
-      source: { id: "nature", name: "Nature" },
-      author: "Dr. Smith",
-      category: "science",
-    },
-  ];
-
   useEffect(() => {
+    let cancelled = false;
+
+    const cached = cacheRepo.getArticles(activeCategory);
+    if (cached) {
+      setArticles(cached);
+      return;
+    }
+
     setLoading(true);
-    // Simulate API call
-    setTimeout(() => {
-      setArticles(mockArticles);
-      setLoading(false);
-    }, 500);
+    fetchArticles(activeCategory)
+      .then(fetched => {
+        if (cancelled) return;
+        setArticles(fetched);
+        cacheRepo.setArticles(activeCategory, 1, fetched);
+      })
+      .catch(error => {
+        if (cancelled) return;
+        console.error(error);
+        toast.error(
+          error instanceof Error ? error.message : "Failed to load news"
+        );
+        setArticles([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [activeCategory]);
 
-  const handleArticleClick = useCallback((article: Article) => {
-    setSelectedArticle(article);
-    addReadingEntry(article);
-  }, [addReadingEntry]);
+  const handleArticleClick = useCallback(
+    (article: Article) => {
+      setSelectedArticle(article);
+      addReadingEntry(article);
+    },
+    [addReadingEntry]
+  );
 
-  const handleBookmark = useCallback((article: Article) => {
-    if (isBookmarked(article.url)) {
-      const bookmark = bookmarks.find((b) => b.article.url === article.url);
-      if (bookmark) removeBookmark(bookmark.id);
-    } else {
-      addBookmark(article);
-    }
-  }, [bookmarks, isBookmarked, addBookmark, removeBookmark]);
+  const handleBookmark = useCallback(
+    (article: Article) => {
+      if (isBookmarked(article.url)) {
+        const bookmark = bookmarks.find(b => b.article.url === article.url);
+        if (bookmark) removeBookmark(bookmark.id);
+      } else {
+        addBookmark(article);
+      }
+    },
+    [bookmarks, isBookmarked, addBookmark, removeBookmark]
+  );
 
-  const handleSummarize = useCallback((article: Article) => {
-    setSelectedArticle(article);
-    setShowSummary(true);
-    
-    // Check if summary already exists
-    const cached = getSummary(article.id);
-    if (cached) {
-      setCurrentSummary(cached);
-    } else {
-      // Simulate generating summary
+  const handleSummarize = useCallback(
+    (article: Article) => {
+      setSelectedArticle(article);
+      setShowSummary(true);
+
+      const cached = getSummary(article.id);
+      if (cached) {
+        setCurrentSummary(cached);
+        return;
+      }
+
       setSummaryLoading(true);
-      setTimeout(() => {
-        const mockSummary: Summary = {
-          articleId: article.id,
-          title: article.title,
-          url: article.url,
-          oneSentence: "This is a summary of the article.",
-          tldr: "Key points about the article in brief.",
-          bulletPoints: [
-            "Point 1 about the article",
-            "Point 2 about the article",
-            "Point 3 about the article",
-          ],
-          executiveSummary: "Detailed summary of the article content.",
-          keyTakeaways: ["Takeaway 1", "Takeaway 2"],
-          sentiment: "neutral",
-          bias: "low",
-          importantNames: ["Name 1", "Name 2"],
-          importantCompanies: ["Company 1"],
-          timeline: ["Event 1", "Event 2"],
-          keywords: ["keyword1", "keyword2", "keyword3"],
-          factCheckConfidence: 85,
-          actionItems: ["Action 1"],
-          generatedAt: new Date().toISOString(),
-        };
-        setCurrentSummary(mockSummary);
-        saveSummary(mockSummary);
-        setSummaryLoading(false);
-      }, 1500);
-    }
-  }, [getSummary, saveSummary]);
+      summarizeArticle(
+        article.title,
+        article.content || article.description,
+        article.url
+      )
+        .then(summary => {
+          setCurrentSummary(summary);
+          saveSummary(summary);
+          addSummaryEntry(article, summary);
+        })
+        .catch(error => {
+          console.error(error);
+          toast.error(
+            error instanceof Error
+              ? error.message
+              : "Failed to generate summary"
+          );
+          setShowSummary(false);
+        })
+        .finally(() => setSummaryLoading(false));
+    },
+    [getSummary, saveSummary, addSummaryEntry]
+  );
 
   useKeyboardShortcuts({
     "search-modal": () => {
@@ -205,7 +201,7 @@ export default function Home() {
                   },
                 }}
               >
-                {articles.map((article) => (
+                {articles.map(article => (
                   <motion.div
                     key={article.id}
                     variants={{

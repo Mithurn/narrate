@@ -27,7 +27,7 @@ Narrate is a production-ready Vite + React web application that aggregates news 
 - **Styling**: TailwindCSS 4 + shadcn/ui
 - **Animation**: Framer Motion
 - **Forms**: React Hook Form + Zod
-- **News API**: FreeNewsAPI
+- **News API**: RapidAPI Real-Time News Data
 - **AI**: Groq (OpenAI-compatible)
 - **Storage**: Browser localStorage with repository pattern
 
@@ -77,6 +77,8 @@ narrate/
 
 ### Data Flow
 
+News fetching and AI summarization are proxied through the Express server (`server/app.ts`, routes `GET /api/news` and `POST /api/summarize`) so the RapidAPI and Groq keys stay server-side and are never bundled into the browser. In development, the same Express app is mounted as Vite dev-server middleware (see `vitePluginApiRoutes` in `vite.config.ts`), so `pnpm dev` alone is enough — no separate API process needed.
+
 ```
 User Interface (React Components)
     ↓
@@ -92,7 +94,7 @@ Browser localStorage
 ### Prerequisites
 
 - Node.js 18+ (with pnpm)
-- FreeNewsAPI key: https://www.newscatcherapi.com/
+- RapidAPI key for "Real-Time News Data": https://rapidapi.com/letscrape-6bRBa3QguO5/api/real-time-news-data
 - Groq API key: https://console.groq.com/
 
 ### Installation
@@ -115,9 +117,11 @@ Browser localStorage
 
    Edit `.env.local` and add your API keys:
    ```
-   FREE_NEWS_API_KEY=your_freenews_api_key
+   RAPIDAPI_KEY=your_rapidapi_key
    GROQ_API_KEY=your_groq_api_key
    ```
+
+   Both keys are read server-side only (by the Express API routes), so they're never bundled into the browser JS.
 
 4. **Start development server**
    ```bash
@@ -264,7 +268,7 @@ This app is a single Node.js server (Express) that serves the built Vite fronten
 2. Create a new service and connect the repository
 3. Set the build command to `pnpm install && pnpm build`
 4. Set the start command to `pnpm start`
-5. Add `FREE_NEWS_API_KEY` and `GROQ_API_KEY` as environment variables
+5. Add `RAPIDAPI_KEY` and `GROQ_API_KEY` as environment variables
 6. Deploy
 
 ### Other Platforms
@@ -312,7 +316,7 @@ This project is licensed under the MIT License—see LICENSE file for details.
 
 ## 🙏 Acknowledgments
 
-- **FreeNewsAPI** for news aggregation
+- **RapidAPI Real-Time News Data** for news aggregation
 - **Groq** for AI-powered summaries
 - **Vercel** for Next.js and deployment
 - **shadcn/ui** for beautiful components

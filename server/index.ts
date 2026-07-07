@@ -1,13 +1,14 @@
-import express from "express";
 import { createServer } from "http";
 import path from "path";
 import { fileURLToPath } from "url";
+import express from "express";
+import { createApp } from "./app";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 async function startServer() {
-  const app = express();
+  const app = createApp();
   const server = createServer(app);
 
   // Serve static files from dist/public in production
