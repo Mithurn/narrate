@@ -1,49 +1,49 @@
 import type { Article } from "../../shared/types";
 
 /**
- * Client for RapidAPI's "Real-Time News Data" API
- * https://rapidapi.com/letscrape-6bRBa3QguO5/api/real-time-news-data
+ * Client for the GNews API (https://gnews.io) — free tier, no marketplace
+ * subscription required, just an API key from the dashboard.
+ * Docs: https://docs.gnews.io/
  */
 
-const BASE_URL = "https://real-time-news-data.p.rapidapi.com";
-const HOST = "real-time-news-data.p.rapidapi.com";
+const BASE_URL = "https://gnews.io/api/v4";
 
-// Maps our app's category ids to Google News-style topics used by the API
-const CATEGORY_TOPICS: Record<string, string> = {
-  technology: "TECHNOLOGY",
-  business: "BUSINESS",
-  science: "SCIENCE",
-  health: "HEALTH",
-  sports: "SPORTS",
-  world: "WORLD",
+// Maps our app's category ids to GNews's built-in categories
+const CATEGORY_MAP: Record<string, string> = {
+  latest: "general",
+  trending: "general",
+  technology: "technology",
+  business: "business",
+  science: "science",
+  health: "health",
+  sports: "sports",
+  world: "world",
 };
 
-// Categories that don't map to a topic use a search query instead
+// Categories with no direct GNews category use a search query instead
 const CATEGORY_SEARCH_QUERIES: Record<string, string> = {
   ai: "artificial intelligence",
 };
 
-interface RapidApiArticle {
-  title?: string;
-  snippet?: string;
+interface GNewsArticle {
+  id?: string;
+  title: string;
   description?: string;
-  link?: string;
-  url?: string;
-  photo_url?: string;
-  thumbnail_url?: string;
-  image_url?: string;
-  published_datetime_utc?: string;
-  published_at?: string;
-  source_url?: string;
-  source_name?: string;
-  publisher?: string;
-  authors?: string[] | string;
-  topic?: string;
+  content?: string;
+  url: string;
+  image?: string;
+  publishedAt?: string;
+  source?: {
+    id?: string;
+    name?: string;
+    url?: string;
+  };
 }
 
-interface RapidApiResponse {
-  data?: RapidApiArticle[];
-  status?: string;
+interface GNewsResponse {
+  totalArticles?: number;
+  articles?: GNewsArticle[];
+  errors?: string[];
 }
 
 function articleId(url: string): string {
@@ -60,68 +60,53 @@ function extractDomain(url: string | undefined): string {
 }
 
 function normalizeArticle(
-  item: RapidApiArticle,
+  item: GNewsArticle,
   category: string
 ): Article | null {
-  const url = item.link ?? item.url;
-  if (!url || !item.title) return null;
-
-  const sourceName =
-    item.source_name ?? item.publisher ?? extractDomain(item.source_url ?? url);
+  if (!item.url || !item.title) return null;
 
   return {
-    id: articleId(url),
+    id: item.id ?? articleId(item.url),
     title: item.title,
-    description: item.snippet ?? item.description ?? "",
-    content: item.snippet ?? item.description ?? "",
-    url,
-    urlToImage: item.photo_url ?? item.thumbnail_url ?? item.image_url,
-    publishedAt:
-      item.published_datetime_utc ??
-      item.published_at ??
-      new Date().toISOString(),
+    description: item.description ?? "",
+    content: item.content ?? item.description ?? "",
+    url: item.url,
+    urlToImage: item.image,
+    publishedAt: item.publishedAt ?? new Date().toISOString(),
     source: {
-      id: extractDomain(item.source_url ?? url),
-      name: sourceName,
+      id: item.source?.id ?? extractDomain(item.source?.url ?? item.url),
+      name: item.source?.name ?? extractDomain(item.url),
     },
-    author: Array.isArray(item.authors)
-      ? item.authors.join(", ")
-      : item.authors,
     category,
   };
 }
 
-async function callRapidApi(
+async function callGNews(
   path: string,
   params: Record<string, string>,
   category: string
 ): Promise<Article[]> {
-  const apiKey = process.env.RAPIDAPI_KEY;
+  const apiKey = process.env.GNEWS_API_KEY;
   if (!apiKey) {
-    throw new Error("RAPIDAPI_KEY is not set on the server");
+    throw new Error("GNEWS_API_KEY is not set on the server");
   }
 
   const url = new URL(path, BASE_URL);
   for (const [key, value] of Object.entries(params)) {
     url.searchParams.set(key, value);
   }
+  url.searchParams.set("apikey", apiKey);
 
-  const response = await fetch(url, {
-    headers: {
-      "x-rapidapi-key": apiKey,
-      "x-rapidapi-host": HOST,
-    },
-  });
+  const response = await fetch(url);
+  const json = (await response.json()) as GNewsResponse;
 
   if (!response.ok) {
-    throw new Error(
-      `RapidAPI request failed: ${response.status} ${response.statusText}`
-    );
+    const message =
+      json.errors?.join(", ") ?? `${response.status} ${response.statusText}`;
+    throw new Error(`GNews request failed: ${message}`);
   }
 
-  const json = (await response.json()) as RapidApiResponse;
-  const items = json.data ?? [];
-
+  const items = json.articles ?? [];
   return items
     .map(item => normalizeArticle(item, category))
     .filter((a): a is Article => a !== null);
@@ -129,23 +114,18 @@ async function callRapidApi(
 
 export async function fetchArticlesByCategory(
   category: string,
-  country = "US",
+  country = "us",
   lang = "en"
 ): Promise<Article[]> {
   const searchQuery = CATEGORY_SEARCH_QUERIES[category];
   if (searchQuery) {
-    return callRapidApi(
-      "/search",
-      { query: searchQuery, country, lang },
-      category
-    );
+    return callGNews("/search", { q: searchQuery, country, lang }, category);
   }
 
-  const topic = CATEGORY_TOPICS[category];
-  if (topic) {
-    return callRapidApi("/topic-headlines", { topic, country, lang }, category);
-  }
-
-  // "latest" / "trending" / unknown categories fall back to top headlines
-  return callRapidApi("/top-headlines", { country, lang }, category);
+  const gnewsCategory = CATEGORY_MAP[category] ?? "general";
+  return callGNews(
+    "/top-headlines",
+    { category: gnewsCategory, country, lang },
+    category
+  );
 }

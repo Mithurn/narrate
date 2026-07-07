@@ -27,7 +27,7 @@ Narrate is a production-ready Vite + React web application that aggregates news 
 - **Styling**: TailwindCSS 4 + shadcn/ui
 - **Animation**: Framer Motion
 - **Forms**: React Hook Form + Zod
-- **News API**: RapidAPI Real-Time News Data
+- **News API**: GNews (free tier)
 - **AI**: Groq (OpenAI-compatible)
 - **Storage**: Browser localStorage with repository pattern
 
@@ -77,7 +77,7 @@ narrate/
 
 ### Data Flow
 
-News fetching and AI summarization are proxied through the Express server (`server/app.ts`, routes `GET /api/news` and `POST /api/summarize`) so the RapidAPI and Groq keys stay server-side and are never bundled into the browser. In development, the same Express app is mounted as Vite dev-server middleware (see `vitePluginApiRoutes` in `vite.config.ts`), so `pnpm dev` alone is enough — no separate API process needed.
+News fetching and AI summarization are proxied through the Express server (`server/app.ts`, routes `GET /api/news` and `POST /api/summarize`) so the GNews and Groq keys stay server-side and are never bundled into the browser. In development, the same Express app is mounted as Vite dev-server middleware (see `vitePluginApiRoutes` in `vite.config.ts`), so `pnpm dev` alone is enough — no separate API process needed.
 
 ```
 User Interface (React Components)
@@ -94,7 +94,7 @@ Browser localStorage
 ### Prerequisites
 
 - Node.js 18+ (with pnpm)
-- RapidAPI key for "Real-Time News Data": https://rapidapi.com/letscrape-6bRBa3QguO5/api/real-time-news-data
+- GNews API key (free tier): https://gnews.io/register
 - Groq API key: https://console.groq.com/
 
 ### Installation
@@ -117,7 +117,7 @@ Browser localStorage
 
    Edit `.env.local` and add your API keys:
    ```
-   RAPIDAPI_KEY=your_rapidapi_key
+   GNEWS_API_KEY=your_gnews_api_key
    GROQ_API_KEY=your_groq_api_key
    ```
 
@@ -268,7 +268,7 @@ This app is a single Node.js server (Express) that serves the built Vite fronten
 2. Create a new service and connect the repository
 3. Set the build command to `pnpm install && pnpm build`
 4. Set the start command to `pnpm start`
-5. Add `RAPIDAPI_KEY` and `GROQ_API_KEY` as environment variables
+5. Add `GNEWS_API_KEY` and `GROQ_API_KEY` as environment variables
 6. Deploy
 
 ### Other Platforms
@@ -316,7 +316,7 @@ This project is licensed under the MIT License—see LICENSE file for details.
 
 ## 🙏 Acknowledgments
 
-- **RapidAPI Real-Time News Data** for news aggregation
+- **GNews** for news aggregation
 - **Groq** for AI-powered summaries
 - **Vercel** for Next.js and deployment
 - **shadcn/ui** for beautiful components
